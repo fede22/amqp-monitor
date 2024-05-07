@@ -1,4 +1,4 @@
-package rabbitmq_wrapper
+package connection
 
 import (
 	"context"
@@ -13,12 +13,12 @@ type connection struct {
 }
 
 type Config struct {
-	createConnection func(ctx context.Context) (*amqp.Connection, error)
-	logError         func(ctx context.Context, err error)
+	CreateConnection func(ctx context.Context) (*amqp.Connection, error)
+	LogError         func(ctx context.Context, err error)
 }
 
 func New(ctx context.Context, config Config) (*connection, error) {
-	conn, err := config.createConnection(ctx)
+	conn, err := config.CreateConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -28,8 +28,13 @@ func New(ctx context.Context, config Config) (*connection, error) {
 		config:       config,
 	}
 	c.connection.NotifyClose(c.closeChannel)
+	c.connection.IsClosed()
 	go c.monitorConnection(ctx)
 	return c, nil
+}
+
+func (c *connection) IsClosed(ctx context.Context) bool {
+	return c.connection.IsClosed()
 }
 
 func (c *connection) monitorConnection(ctx context.Context) {
@@ -42,7 +47,7 @@ func (c *connection) monitorConnection(ctx context.Context) {
 			c.renewConnectionWithBackoff(ctx)
 		case <-ctx.Done():
 			if err := c.connection.Close(); err != nil {
-				c.config.logError(ctx, err)
+				c.config.LogError(ctx, err)
 			}
 			return
 		}
@@ -69,9 +74,9 @@ func (c *connection) renewConnectionWithBackoff(ctx context.Context) {
 }
 
 func (c *connection) renewConnection(ctx context.Context) error {
-	newConn, err := c.config.createConnection(ctx)
+	newConn, err := c.config.CreateConnection(ctx)
 	if err != nil {
-		c.config.logError(ctx, err)
+		c.config.LogError(ctx, err)
 		return err
 	}
 	c.connection = newConn
