@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,7 @@ type connection struct {
 	config       Config
 	connection   *amqp.Connection
 	closeChannel chan *amqp.Error
+	mutex        *sync.Mutex
 }
 
 type Config struct {
@@ -26,15 +28,25 @@ func New(ctx context.Context, config Config) (*connection, error) {
 		connection:   conn,
 		closeChannel: make(chan *amqp.Error),
 		config:       config,
+		mutex:        &sync.Mutex{},
 	}
 	c.connection.NotifyClose(c.closeChannel)
-	c.connection.IsClosed()
 	go c.monitorConnection(ctx)
 	return c, nil
 }
 
-func (c *connection) IsClosed(ctx context.Context) bool {
-	return c.connection.IsClosed()
+func (c *connection) GetConnection() *amqp.Connection {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return c.connection
+}
+
+func (c *connection) setNewConnection(newConn *amqp.Connection) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.connection = newConn
+	c.closeChannel = make(chan *amqp.Error)
+	c.connection.NotifyClose(c.closeChannel)
 }
 
 func (c *connection) monitorConnection(ctx context.Context) {
@@ -46,7 +58,7 @@ func (c *connection) monitorConnection(ctx context.Context) {
 			}
 			c.renewConnectionWithBackoff(ctx)
 		case <-ctx.Done():
-			if err := c.connection.Close(); err != nil {
+			if err := c.GetConnection().Close(); err != nil {
 				c.config.LogError(ctx, err)
 			}
 			return
@@ -79,8 +91,6 @@ func (c *connection) renewConnection(ctx context.Context) error {
 		c.config.LogError(ctx, err)
 		return err
 	}
-	c.connection = newConn
-	c.closeChannel = make(chan *amqp.Error)
-	c.connection.NotifyClose(c.closeChannel)
+	c.setNewConnection(newConn)
 	return nil
 }

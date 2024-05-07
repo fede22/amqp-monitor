@@ -2,7 +2,7 @@ package connection_test
 
 import (
 	"log"
-	"rabbitmq-wrapper/internal/local"
+	"rabbitmq-wrapper/pkg/internal/local"
 	"testing"
 )
 

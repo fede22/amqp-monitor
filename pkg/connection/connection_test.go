@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/stretchr/testify/require"
 	"log"
-	"rabbitmq-wrapper/internal/connection"
-	"rabbitmq-wrapper/internal/local"
+	"rabbitmq-wrapper/pkg/connection"
+	"rabbitmq-wrapper/pkg/internal/local"
 	"testing"
 	"time"
 )
@@ -24,16 +24,16 @@ func TestConnection_Reconnect(t *testing.T) {
 	})
 	require.NoError(t, err)
 	// Validate that the connection is working
-	require.False(t, conn.IsClosed(ctx))
+	require.False(t, conn.GetConnection().IsClosed())
 	// ShutdownContainer the local rabbit instance
 	require.NoError(t, local.ShutdownContainer())
 	// Validate that the connection is not working
-	require.True(t, conn.IsClosed(ctx))
+	require.True(t, conn.GetConnection().IsClosed())
 	//Restart the local rabbit instance.
 	require.NoError(t, local.InitializeContainer())
 	// Retry until the connection is re-established. If the connection is not re-established in 50 seconds, the test will fail.
 	require.NoError(t, retry(func() bool {
-		return conn.IsClosed(ctx)
+		return conn.GetConnection().IsClosed()
 	}, false, 10, 5*time.Second))
 }
 
