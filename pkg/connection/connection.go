@@ -2,12 +2,13 @@ package connection
 
 import (
 	"context"
+	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"sync"
 	"time"
 )
 
-type connection struct {
+type Connection struct {
 	config       Config
 	connection   *amqp.Connection
 	closeChannel chan *amqp.Error
@@ -15,16 +16,19 @@ type connection struct {
 }
 
 type Config struct {
-	CreateConnection func(ctx context.Context) (*amqp.Connection, error)
-	LogError         func(ctx context.Context, err error)
+	CreateConnection func(ctx context.Context) (*amqp.Connection, error) `validate:"required"`
+	LogError         func(ctx context.Context, err error)                `validate:"required"`
 }
 
-func New(ctx context.Context, config Config) (*connection, error) {
+func New(ctx context.Context, config Config) (*Connection, error) {
+	if err := validator.New().Struct(config); err != nil {
+		return nil, err
+	}
 	conn, err := config.CreateConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
-	c := &connection{
+	c := &Connection{
 		connection:   conn,
 		closeChannel: make(chan *amqp.Error),
 		config:       config,
@@ -35,13 +39,13 @@ func New(ctx context.Context, config Config) (*connection, error) {
 	return c, nil
 }
 
-func (c *connection) GetConnection() *amqp.Connection {
+func (c *Connection) GetConnection() *amqp.Connection {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return c.connection
 }
 
-func (c *connection) setNewConnection(newConn *amqp.Connection) {
+func (c *Connection) setNewConnection(newConn *amqp.Connection) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.connection = newConn
@@ -49,7 +53,7 @@ func (c *connection) setNewConnection(newConn *amqp.Connection) {
 	c.connection.NotifyClose(c.closeChannel)
 }
 
-func (c *connection) monitorConnection(ctx context.Context) {
+func (c *Connection) monitorConnection(ctx context.Context) {
 	for {
 		select {
 		case _, ok := <-c.closeChannel:
@@ -66,7 +70,7 @@ func (c *connection) monitorConnection(ctx context.Context) {
 	}
 }
 
-func (c *connection) renewConnectionWithBackoff(ctx context.Context) {
+func (c *Connection) renewConnectionWithBackoff(ctx context.Context) {
 	backoffTime := time.Second
 	timer := time.NewTimer(backoffTime)
 	defer timer.Stop()
@@ -85,7 +89,7 @@ func (c *connection) renewConnectionWithBackoff(ctx context.Context) {
 	}
 }
 
-func (c *connection) renewConnection(ctx context.Context) error {
+func (c *Connection) renewConnection(ctx context.Context) error {
 	newConn, err := c.config.CreateConnection(ctx)
 	if err != nil {
 		c.config.LogError(ctx, err)

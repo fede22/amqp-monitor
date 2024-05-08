@@ -1,17 +1,18 @@
-package connection_test
+package channel_test
 
 import (
 	"context"
 	"errors"
 	"github.com/stretchr/testify/require"
 	"log"
+	"rabbitmq-wrapper/pkg/channel"
 	"rabbitmq-wrapper/pkg/connection"
 	"rabbitmq-wrapper/pkg/internal/local"
 	"testing"
 	"time"
 )
 
-func TestConnection_Reconnect(t *testing.T) {
+func TestChannel_Reconnect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	createConnection, err := local.CreateConnection()
@@ -25,16 +26,29 @@ func TestConnection_Reconnect(t *testing.T) {
 	require.NoError(t, err)
 	// Validate that the Connection is working
 	require.False(t, conn.GetConnection().IsClosed())
+	ch, err := channel.New(ctx, channel.Config{
+		Connection: conn,
+		LogError: func(ctx context.Context, err error) {
+			log.Printf("Error: %s", err.Error())
+		},
+	})
+	require.NoError(t, err)
+	// Validate that the Channel is working
+	require.False(t, ch.GetChannel().IsClosed())
 	// ShutdownContainer the local rabbit instance
 	require.NoError(t, local.ShutdownContainer())
 	// Validate that the Connection is not working
 	require.True(t, conn.GetConnection().IsClosed())
+	// Validate that the Channel is not working
+	require.True(t, ch.GetChannel().IsClosed())
 	//Restart the local rabbit instance.
 	require.NoError(t, local.InitializeContainer())
-	// Retry until the Connection is re-established. If the Connection is not re-established in 50 seconds, the test will fail.
+	// Retry until the Channel is re-established. If the Channel is not re-established in 50 seconds, the test will fail.
 	require.NoError(t, retry(func() bool {
-		return conn.GetConnection().IsClosed()
+		return ch.GetChannel().IsClosed()
 	}, false, 10, 5*time.Second))
+	// Validate that the Connection is working too
+	require.False(t, conn.GetConnection().IsClosed())
 }
 
 func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {

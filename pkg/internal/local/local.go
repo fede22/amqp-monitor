@@ -25,6 +25,9 @@ func CreateConnection() (func(ctx context.Context) (*amqp.Connection, error), er
 }
 
 func InitializeContainer() error {
+	if container != nil {
+		return nil
+	}
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		return fmt.Errorf("could not construct pool: %s", err)
