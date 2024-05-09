@@ -1,18 +1,20 @@
-package channel_test
+package consumer_test
 
 import (
 	"context"
 	"errors"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
 	"log"
 	"rabbitmq-wrapper/pkg/channel"
 	"rabbitmq-wrapper/pkg/connection"
+	"rabbitmq-wrapper/pkg/consumer"
 	"rabbitmq-wrapper/pkg/internal/local"
 	"testing"
 	"time"
 )
 
-func TestChannel_Reconnect(t *testing.T) {
+func TestConsumer_Reconnect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	createConnection, err := local.CreateConnection()
@@ -35,6 +37,47 @@ func TestChannel_Reconnect(t *testing.T) {
 	require.NoError(t, err)
 	// Validate that the Channel is working
 	require.False(t, ch.GetChannel().IsClosed())
+	q, err := ch.GetChannel().QueueDeclare(
+		"test-queue", // name
+		false,        // durable
+		false,        // delete when unused
+		false,        // exclusive
+		false,        // no-wait
+		nil,          // arguments
+	)
+	require.NoError(t, err)
+
+	// Create a consumer function for testing
+	createConsumer := func(ctx context.Context) (<-chan amqp.Delivery, error) {
+		return ch.GetChannel().Consume(
+			q.Name, // queue
+			"",     // consumer
+			true,   // auto-ack
+			false,  // exclusive
+			false,  // no-local
+			false,  // no-wait
+			nil,    // args
+		)
+	}
+
+	// Initialize the consumer
+	msgs, err := consumer.New(ctx, consumer.Config{
+		CreateConsumer: createConsumer,
+		LogError: func(ctx context.Context, err error) {
+			log.Printf("Error: %s", err.Error())
+		},
+	})
+	require.NoError(t, err)
+
+	// Send a message to the queue
+	require.NoError(t, ch.GetChannel().PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
+		ContentType: "text/plain",
+		Body:        []byte("Hello World"),
+	}))
+
+	//Consume the message
+	require.Equal(t, "Hello World", string((<-msgs).Body))
+
 	// Shutdown the local rabbit instance
 	require.NoError(t, local.ShutdownContainer())
 	// Validate that the Connection is not working
@@ -49,6 +92,17 @@ func TestChannel_Reconnect(t *testing.T) {
 	}, false, 10, 5*time.Second))
 	// Validate that the Connection is working too
 	require.False(t, conn.GetConnection().IsClosed())
+
+	/*
+		// Send a message to the queue
+		require.NoError(t, ch.GetChannel().PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte("Hello World"),
+		}))
+
+		//Consume the message
+		require.Equal(t, "Hello World", string((<-msgs).Body))
+	*/
 }
 
 func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
