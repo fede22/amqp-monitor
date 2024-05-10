@@ -14,20 +14,12 @@ var (
 )
 
 func CreateConnection() (func(ctx context.Context) (*amqp.Connection, error), error) {
-	if container == nil {
-		if err := InitializeContainer(); err != nil {
-			return nil, err
-		}
-	}
 	return func(ctx context.Context) (*amqp.Connection, error) {
 		return amqp.Dial("amqp://guest:guest@localhost:5672")
 	}, nil
 }
 
 func InitializeContainer() error {
-	if container != nil {
-		return nil
-	}
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		return fmt.Errorf("could not construct pool: %s", err)

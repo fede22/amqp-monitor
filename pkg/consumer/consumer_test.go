@@ -39,7 +39,7 @@ func TestConsumer_Reconnect(t *testing.T) {
 	require.False(t, ch.GetChannel().IsClosed())
 	q, err := ch.GetChannel().QueueDeclare(
 		"test-queue", // name
-		false,        // durable
+		true,         // durable
 		false,        // delete when unused
 		false,        // exclusive
 		false,        // no-wait
@@ -90,19 +90,25 @@ func TestConsumer_Reconnect(t *testing.T) {
 	require.NoError(t, retry(func() bool {
 		return ch.GetChannel().IsClosed()
 	}, false, 10, 5*time.Second))
-	// Validate that the Connection is working too
+	//Validate that the Connection is working too
 	require.False(t, conn.GetConnection().IsClosed())
-
-	/*
-		// Send a message to the queue
-		require.NoError(t, ch.GetChannel().PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte("Hello World"),
-		}))
-
-		//Consume the message
-		require.Equal(t, "Hello World", string((<-msgs).Body))
-	*/
+	//Redeclare the queue because the container is no durable.
+	q, err = ch.GetChannel().QueueDeclare(
+		"test-queue", // name
+		true,         // durable
+		false,        // delete when unused
+		false,        // exclusive
+		false,        // no-wait
+		nil,          // arguments
+	)
+	require.NoError(t, err)
+	// Send a new message to the queue
+	require.NoError(t, ch.GetChannel().PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
+		ContentType: "text/plain",
+		Body:        []byte("Hello World, again!"),
+	}))
+	//Consume the message
+	require.Equal(t, "Hello World, again!", string((<-msgs).Body))
 }
 
 func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
