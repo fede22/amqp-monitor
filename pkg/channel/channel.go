@@ -59,7 +59,7 @@ func (ch *Channel) monitorChannel(ctx context.Context) {
 		select {
 		case _, ok := <-ch.closeChannel:
 			if !ok {
-				break
+				return
 			}
 			ch.renewChannelWithBackoff(ctx)
 		case <-ctx.Done():

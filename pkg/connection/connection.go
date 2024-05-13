@@ -58,7 +58,7 @@ func (c *Connection) monitorConnection(ctx context.Context) {
 		select {
 		case _, ok := <-c.closeChannel:
 			if !ok {
-				break
+				return
 			}
 			c.renewConnectionWithBackoff(ctx)
 		case <-ctx.Done():
