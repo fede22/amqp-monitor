@@ -37,6 +37,51 @@ func TestConnection_Reconnect(t *testing.T) {
 	}, false, 10, 5*time.Second))
 }
 
+func TestConnection_Close(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	createConnection, err := local.CreateConnection()
+	require.NoError(t, err)
+	conn, err := connection.New(ctx, connection.Config{
+		CreateConnection: createConnection,
+		LogError: func(ctx context.Context, err error) {
+			log.Printf("Error: %s", err.Error())
+		},
+	})
+	require.NoError(t, err)
+	// Validate that the Connection is working
+	require.False(t, conn.GetConnection().IsClosed())
+	// Close the Connection
+	require.NoError(t, conn.GetConnection().Close())
+	// Validate that the Connection is not working
+	require.True(t, conn.GetConnection().IsClosed())
+	// Validate that the Connection is still not working after one minute
+	// because the monitor goroutine has been shut down correctly after the connection was closed.
+	time.Sleep(1 * time.Minute)
+	require.True(t, conn.GetConnection().IsClosed())
+}
+
+func TestConnection_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	createConnection, err := local.CreateConnection()
+	require.NoError(t, err)
+	conn, err := connection.New(ctx, connection.Config{
+		CreateConnection: createConnection,
+		LogError: func(ctx context.Context, err error) {
+			log.Printf("Error: %s", err.Error())
+		},
+	})
+	require.NoError(t, err)
+	// Validate that the Connection is working
+	require.False(t, conn.GetConnection().IsClosed())
+	// Cancel the context
+	cancel()
+	time.Sleep(time.Second * 10)
+	// Validate that the Connection is not working because the context was cancelled and the monitor goroutine shutoff the connection before returning
+	require.True(t, conn.GetConnection().IsClosed())
+}
+
 func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
 	for i := 0; i < attempts; i++ {
 		if ok := fn(); ok == expected {
