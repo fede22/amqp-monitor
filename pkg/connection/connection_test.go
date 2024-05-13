@@ -55,8 +55,8 @@ func TestConnection_Close(t *testing.T) {
 	require.NoError(t, conn.GetConnection().Close())
 	// Validate that the Connection is not working
 	require.True(t, conn.GetConnection().IsClosed())
-	// Validate that the Connection is still not working after one minute
-	// because the monitor goroutine has been shut down correctly after the connection was closed.
+	// Validate that the Connection is still not working after one minute because the monitor goroutine has been
+	// shut down correctly after the connection was closed.
 	time.Sleep(1 * time.Minute)
 	require.True(t, conn.GetConnection().IsClosed())
 }
