@@ -111,6 +111,12 @@ func TestConsumer_Reconnect(t *testing.T) {
 	require.Equal(t, "Hello World, again!", string((<-msgs).Body))
 }
 
+// Cancel the monitor using the context. Cancel the consumer using the channel.Cancel method.
+func TestConsumer_Cancel(t *testing.T) {}
+
+// Start the context with ConsumeWithContext. Cancel both the consumer and the monitor using the context.
+func TestConsumer_ContextCancellation(t *testing.T) {}
+
 func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
 	for i := 0; i < attempts; i++ {
 		if ok := fn(); ok == expected {
