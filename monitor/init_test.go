@@ -2,7 +2,7 @@ package monitor_test
 
 import (
 	"log"
-	"rabbitmq-wrapper/monitor/internal/local"
+	"rabbit-monitor/monitor/internal/local"
 	"testing"
 )
 
