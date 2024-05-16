@@ -1,4 +1,4 @@
-package consumer
+package monitor
 
 import (
 	"context"
@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-type consumer struct {
-	config          Config
+type consumerMonitor struct {
+	config          ConsumerConfig
 	messagesChannel <-chan amqp.Delivery
 	out             chan amqp.Delivery
 }
 
-type Config struct {
+type ConsumerConfig struct {
 	CreateConsumer func(ctx context.Context) (<-chan amqp.Delivery, error) `validate:"required"`
 	LogError       func(ctx context.Context, err error)                    `validate:"required"`
 }
 
-func New(ctx context.Context, config Config) (<-chan amqp.Delivery, error) {
+func Consumer(ctx context.Context, config ConsumerConfig) (<-chan amqp.Delivery, error) {
 	if err := validator.New().Struct(config); err != nil {
 		return nil, err
 	}
@@ -26,38 +26,38 @@ func New(ctx context.Context, config Config) (<-chan amqp.Delivery, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &consumer{
-		messagesChannel: messagesChannel,
+	m := &consumerMonitor{
 		config:          config,
+		messagesChannel: messagesChannel,
 		out:             make(chan amqp.Delivery),
 	}
-	go c.monitorConsumer(ctx)
-	return c.out, nil
+	go m.monitor(ctx)
+	return m.out, nil
 }
 
-func (c *consumer) monitorConsumer(ctx context.Context) {
+func (m *consumerMonitor) monitor(ctx context.Context) {
 	for {
 		select {
-		case msg, ok := <-c.messagesChannel:
+		case msg, ok := <-m.messagesChannel:
 			if !ok {
-				c.renewConsumerWithBackoff(ctx)
+				m.renewConsumerWithBackoff(ctx)
 				break
 			}
-			c.out <- msg
+			m.out <- msg
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (c *consumer) renewConsumerWithBackoff(ctx context.Context) {
+func (m *consumerMonitor) renewConsumerWithBackoff(ctx context.Context) {
 	backoffTime := time.Second
 	timer := time.NewTimer(backoffTime)
 	defer timer.Stop()
 	for {
 		select {
 		case <-timer.C:
-			if err := c.renewConsumer(ctx); err != nil {
+			if err := m.renewConsumer(ctx); err != nil {
 				backoffTime = min(backoffTime*2, time.Minute*2)
 				timer.Reset(backoffTime)
 				break
@@ -69,12 +69,12 @@ func (c *consumer) renewConsumerWithBackoff(ctx context.Context) {
 	}
 }
 
-func (c *consumer) renewConsumer(ctx context.Context) error {
-	newMessagesChannel, err := c.config.CreateConsumer(ctx)
+func (m *consumerMonitor) renewConsumer(ctx context.Context) error {
+	newMessagesChannel, err := m.config.CreateConsumer(ctx)
 	if err != nil {
-		c.config.LogError(ctx, err)
+		m.config.LogError(ctx, err)
 		return err
 	}
-	c.messagesChannel = newMessagesChannel
+	m.messagesChannel = newMessagesChannel
 	return nil
 }

@@ -1,8 +1,8 @@
-package consumer_test
+package monitor_test
 
 import (
 	"log"
-	"rabbitmq-wrapper/pkg/internal/local"
+	"rabbitmq-wrapper/monitor/internal/local"
 	"testing"
 )
 

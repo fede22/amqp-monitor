@@ -1,13 +1,11 @@
-package channel_test
+package monitor_test
 
 import (
 	"context"
-	"errors"
 	"github.com/stretchr/testify/require"
 	"log"
-	"rabbitmq-wrapper/pkg/channel"
-	"rabbitmq-wrapper/pkg/connection"
-	"rabbitmq-wrapper/pkg/internal/local"
+	"rabbitmq-wrapper/monitor"
+	"rabbitmq-wrapper/monitor/internal/local"
 	"testing"
 	"time"
 )
@@ -17,7 +15,7 @@ func TestChannel_Reconnect(t *testing.T) {
 	defer cancel()
 	createConnection, err := local.CreateConnection()
 	require.NoError(t, err)
-	conn, err := connection.New(ctx, connection.Config{
+	conn, err := monitor.Connection(ctx, monitor.ConnectionConfig{
 		CreateConnection: createConnection,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
@@ -26,8 +24,8 @@ func TestChannel_Reconnect(t *testing.T) {
 	require.NoError(t, err)
 	// Validate that the Connection is working
 	require.False(t, conn.GetConnection().IsClosed())
-	ch, err := channel.New(ctx, channel.Config{
-		Connection: conn,
+	ch, err := monitor.Channel(ctx, monitor.ChannelConfig{
+		ConnectionMonitor: conn,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
 		},
@@ -56,7 +54,7 @@ func TestChannel_Close(t *testing.T) {
 	defer cancel()
 	createConnection, err := local.CreateConnection()
 	require.NoError(t, err)
-	conn, err := connection.New(ctx, connection.Config{
+	conn, err := monitor.Connection(ctx, monitor.ConnectionConfig{
 		CreateConnection: createConnection,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
@@ -65,8 +63,8 @@ func TestChannel_Close(t *testing.T) {
 	require.NoError(t, err)
 	// Validate that the Connection is working
 	require.False(t, conn.GetConnection().IsClosed())
-	ch, err := channel.New(ctx, channel.Config{
-		Connection: conn,
+	ch, err := monitor.Channel(ctx, monitor.ChannelConfig{
+		ConnectionMonitor: conn,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
 		},
@@ -91,7 +89,7 @@ func TestChannel_ContextCancellation_I(t *testing.T) {
 	require.NoError(t, err)
 	connectionCtx, connectionCtxCancel := context.WithCancel(context.Background())
 	defer connectionCtxCancel()
-	conn, err := connection.New(connectionCtx, connection.Config{
+	conn, err := monitor.Connection(connectionCtx, monitor.ConnectionConfig{
 		CreateConnection: createConnection,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
@@ -101,8 +99,8 @@ func TestChannel_ContextCancellation_I(t *testing.T) {
 	// Validate that the Connection is working
 	require.False(t, conn.GetConnection().IsClosed())
 	channelCtx, channelCtxCancel := context.WithCancel(context.Background())
-	ch, err := channel.New(channelCtx, channel.Config{
-		Connection: conn,
+	ch, err := monitor.Channel(channelCtx, monitor.ChannelConfig{
+		ConnectionMonitor: conn,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
 		},
@@ -123,7 +121,7 @@ func TestChannel_ContextCancellation_II(t *testing.T) {
 	createConnection, err := local.CreateConnection()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
-	conn, err := connection.New(ctx, connection.Config{
+	conn, err := monitor.Connection(ctx, monitor.ConnectionConfig{
 		CreateConnection: createConnection,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
@@ -132,8 +130,8 @@ func TestChannel_ContextCancellation_II(t *testing.T) {
 	require.NoError(t, err)
 	// Validate that the Connection is working
 	require.False(t, conn.GetConnection().IsClosed())
-	ch, err := channel.New(ctx, channel.Config{
-		Connection: conn,
+	ch, err := monitor.Channel(ctx, monitor.ChannelConfig{
+		ConnectionMonitor: conn,
 		LogError: func(ctx context.Context, err error) {
 			log.Printf("Error: %s", err.Error())
 		},
@@ -150,14 +148,4 @@ func TestChannel_ContextCancellation_II(t *testing.T) {
 	require.True(t, ch.GetChannel().IsClosed())
 	// Validate that the Connection is closed because the context was cancelled and the monitor goroutine shutoff the connection before returning
 	require.True(t, conn.GetConnection().IsClosed())
-}
-
-func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
-	for i := 0; i < attempts; i++ {
-		if ok := fn(); ok == expected {
-			return nil
-		}
-		time.Sleep(interval)
-	}
-	return errors.New("didn't get expected result in time")
 }
