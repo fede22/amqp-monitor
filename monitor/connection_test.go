@@ -2,6 +2,7 @@ package monitor_test
 
 import (
 	"context"
+	"errors"
 	"github.com/stretchr/testify/require"
 	"log"
 	"rabbitmq-wrapper/monitor"
@@ -79,4 +80,14 @@ func TestConnection_ContextCancellation(t *testing.T) {
 	time.Sleep(time.Second * 10)
 	// Validate that the Connection is not working because the context was cancelled and the monitor goroutine shutoff the connection before returning
 	require.True(t, conn.GetConnection().IsClosed())
+}
+
+func retry(fn func() bool, expected bool, attempts int, interval time.Duration) error {
+	for i := 0; i < attempts; i++ {
+		if ok := fn(); ok == expected {
+			return nil
+		}
+		time.Sleep(interval)
+	}
+	return errors.New("didn't get expected result in time")
 }
