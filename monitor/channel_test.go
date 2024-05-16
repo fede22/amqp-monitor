@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/stretchr/testify/require"
 	"log"
-	"rabbitmq-wrapper/monitor"
-	"rabbitmq-wrapper/monitor/internal/local"
+	"rabbit-monitor/monitor"
+	"rabbit-monitor/monitor/internal/local"
 	"testing"
 	"time"
 )
