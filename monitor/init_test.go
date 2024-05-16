@@ -1,8 +1,8 @@
 package monitor_test
 
 import (
+	"amqp-monitor/monitor/internal/local"
 	"log"
-	"rabbit-monitor/monitor/internal/local"
 	"testing"
 )
 

@@ -1,12 +1,12 @@
 package monitor_test
 
 import (
+	"amqp-monitor/monitor"
+	"amqp-monitor/monitor/internal/local"
 	"context"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
 	"log"
-	"rabbit-monitor/monitor"
-	"rabbit-monitor/monitor/internal/local"
 	"testing"
 	"time"
 )
